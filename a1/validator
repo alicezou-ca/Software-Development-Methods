@@ -1,0 +1,212 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 01 2024
+@author: rivera
+"""
+from sys import argv as args
+import os
+
+TEST_FILES: list = ['test01.txt',
+                    'test02.txt',
+                    'test03.txt',
+                    'test04.txt',
+                    'test05.txt',
+                    'test06.txt',
+                    'test07.txt',
+                    'test08.txt',
+                    'test09.txt',]
+REQUIRED_FILES: list = ['route_manager', 'airline-routes-data.csv']
+TESTER_PROGRAM_NAME: str = 'tester'
+PROGRAM_ARGS: str = '<test(e.g.,1,2,3,4,5,6,7,8,9)>'
+REMOVE_FILES: bool = True
+USAGE_MSG: str = f'Usage: ./{TESTER_PROGRAM_NAME} {PROGRAM_ARGS} or ./{TESTER_PROGRAM_NAME}'
+
+
+def is_empty_file(file_path):
+    """Determines whether a file is empty or not.
+            Parameters
+            ----------
+                file_path : str, required
+                    The file path.
+            Returns
+            -------
+                bool
+    """
+    return os.path.getsize(file_path) == 0
+
+
+def required_files_exist() -> bool:
+    """Determines whether there are missing files.
+            Returns
+            -------
+                bool
+    """
+    exist: bool = True
+    for file in REQUIRED_FILES + TEST_FILES:
+        if not os.path.isfile(file):
+            exist = False
+            break
+    return exist
+
+
+def print_message(is_error: bool, message: str) -> None:
+    """Prints a message to stdout.
+            Parameters
+            ----------
+                is_error : bool, required
+                    Indicates whether the message is an error.
+                message : str, required
+                    The message to be printed out.
+    """
+    message_type: str = 'ERROR' if is_error else 'INFO'
+    print(f'[{TESTER_PROGRAM_NAME}] ({message_type}): {message}')
+
+
+def generate_execution_commands(question: str) -> list:
+    """Generates the execution commands for the tests.
+            Parameters
+            ----------
+                question : str, required
+                    The question (test) for the commands to be generated. None if all test cases should be generated.
+            Returns
+            -------
+                list
+                    A list with all the commands generated.
+    """
+    commands: list = []
+    commands.append('./route_manager --DATA="airline-routes-data.csv" --AIRLINE="SWR" --DEST_COUNTRY="Argentina"')
+    commands.append('./route_manager --DATA="airline-routes-data.csv" --AIRLINE="ETH" --DEST_COUNTRY="Egypt"')
+    commands.append('./route_manager --DATA="airline-routes-data.csv" --AIRLINE="ACA" --DEST_COUNTRY="Bahamas"')
+    commands.append('./route_manager --DATA="airline-routes-data.csv" --SRC_COUNTRY="Australia" --DEST_CITY="Zurich" --DEST_COUNTRY="Switzerland"')
+    commands.append('./route_manager --DATA="airline-routes-data.csv" --SRC_COUNTRY="India" --DEST_CITY="Tokyo" --DEST_COUNTRY="Japan"')
+    commands.append('./route_manager --DATA="airline-routes-data.csv" --SRC_COUNTRY="Panama" --DEST_CITY="New York" --DEST_COUNTRY="United States"')
+    commands.append('./route_manager --DATA="airline-routes-data.csv" --SRC_CITY="Victoria" --SRC_COUNTRY="Canada" --DEST_CITY="Cancun" --DEST_COUNTRY="Mexico"')
+    commands.append('./route_manager --DATA="airline-routes-data.csv" --SRC_CITY="Toronto" --SRC_COUNTRY="Canada" --DEST_CITY="Cancun" --DEST_COUNTRY="Mexico"')
+    commands.append('./route_manager --DATA="airline-routes-data.csv" --SRC_CITY="Paris" --SRC_COUNTRY="France" --DEST_CITY="Dubai" --DEST_COUNTRY="United Arab Emirates"')
+    number: int = -1
+    if question is not None:
+        number = int(question) - 1
+    commands = [commands[number]] if number >= 0 else commands
+    return commands
+
+
+def read_lines_from_file(file_path: str) -> list:
+    """Reads the lines from a text-based file.
+            Parameters
+            ----------
+                file_path : str
+                    the path of the file to read
+
+            Returns
+            -------
+                list
+                    a list with the lines of the file read
+    """
+    lines_read = []
+    file = open(file_path, 'r')
+    lines: list = file.readlines()
+    for line in lines:
+        lines_read.append(line)
+    file.close()
+    return lines_read
+
+
+def validate_tests(execution_commands: list, question: str) -> None:
+    """Generates the execution commands for the tests.
+            Parameters
+            ----------
+                execution_commands : list, required
+                    The generated commands.
+                question : str, required
+                    The question for the commands to be generated. None if all test cases should be generated.
+    """
+    separator: str = '----------------------------------------'
+    print_message(is_error=False, message=f'Tests to run: {len(execution_commands)}')
+    tests_passed: int = 0
+    result = ''
+    for i in range(len(execution_commands)):
+        test: int = int(question) if question is not None else i + 1
+        print_message(is_error=False, message=f'|Test {test}|' + separator)
+        command: str = execution_commands[i]
+        required: list = [f'output.txt']
+        # delete existing files
+        for required_file in required:
+            if os.path.isfile(required_file) and REMOVE_FILES:
+                os.remove(required_file)
+        test_pass: bool = True
+        test_error: bool = False
+        print_message(is_error=False, message=f'Attempting: {command}')
+        # execute command
+        os.system(command=command)
+        # validate generated files (txt)
+        differences: list = []
+        if not os.path.isfile(required[0]):
+            print_message(is_error=False, message=f'route_manager should generate {required[0]} for this test.')
+            test_pass = False
+            test_error = True
+        else:
+            # read csvs
+            produced_file: str = required[0]
+            expected_file: str = f'test0{test}.txt'
+            # check whether the files are empty
+            if is_empty_file(produced_file) or is_empty_file(expected_file):
+                print_message(is_error=True, message=f'{produced_file} and {expected_file} can not be empty.')
+                test_pass = False
+                test_error = True
+            else:
+                expected_lines: list = read_lines_from_file(file_path=expected_file)
+                provided_lines: list = read_lines_from_file(file_path=produced_file)
+                # compare lines
+                test_pass = True
+                if len(provided_lines) != len(expected_lines):
+                    test_pass = False
+                    differences.append(f'(Test {test}): expected {len(expected_lines)} lines, but generated {len(provided_lines)}.')
+                else:
+                    for j in range(len(expected_lines)):
+                        expected_line: str = expected_lines[j]
+                        provided_line: str = provided_lines[j]
+                        if provided_line.rstrip() != expected_line.rstrip():
+                            differences.append(f'(Test {test}) - Line {j + 1}:\nExpected:\n{expected_line.rstrip()}\nGenerated:\n{provided_line.rstrip()}')
+                            test_pass = False
+        print_message(is_error=False, message=f'TEST PASSED: {test_pass}')
+        if not test_pass and not test_error:
+            print_message(is_error=False, message=f'DIFFERENCES: {result}')
+            for difference in differences:
+                print(difference)
+        if test_pass:
+            tests_passed += 1
+    print_message(is_error=False, message=separator + '--------')
+    print_message(is_error=False, message=f'TESTS PASSED: {tests_passed}/{len(execution_commands)} ({round((tests_passed/len(execution_commands))*100,1)}%)')
+
+
+def main():
+    """Main entry point of the program."""
+    if len(args) - 1 > len(PROGRAM_ARGS.split(" ")):
+        print_message(is_error=True, message=USAGE_MSG)
+    else:
+        question: str = None
+        if len(args) != 1:
+            question = args[1]
+        # validate required files
+        if not required_files_exist():
+            print_message(is_error=True, message=f'Required files: {REQUIRED_FILES + TEST_FILES}')
+        else:
+            # validate args
+            valid_args: bool = True
+            try:
+                if question is not None:
+                    question_int: int = int(question)
+                    if question_int not in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
+                        valid_args = False
+            except ValueError:
+                valid_args = False
+            if valid_args:
+                commands: list = generate_execution_commands(question=question)
+                validate_tests(execution_commands=commands, question=question)
+            else:
+                print_message(is_error=True, message=USAGE_MSG)
+
+
+if __name__ == '__main__':
+    main()
